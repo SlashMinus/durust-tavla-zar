@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dürüst Tavla — Zar Doğrulama</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #151215; --card: #211c20; --text: #f5f0e8; --muted: #a59d92;
+    --gold: #deaa48; --ok: #6ece84; --bad: #e86860; --line: #ffffff1f;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  main { max-width: 720px; margin: 0 auto; padding: 28px 16px 48px; }
+  h1 { font-family: Georgia, "Noto Serif", serif; color: var(--gold); font-size: 28px; margin: 0 0 4px; }
+  .lang { float: right; }
+  .lang button { background: none; border: 1px solid var(--line); color: var(--muted); border-radius: 6px; padding: 2px 10px; cursor: pointer; }
+  .lang button.on { color: var(--text); border-color: var(--gold); }
+  p { color: var(--muted); margin: 8px 0 16px; }
+  textarea {
+    width: 100%; min-height: 150px; resize: vertical; padding: 12px;
+    background: var(--card); color: var(--text); border: 1px solid var(--line); border-radius: 10px;
+    font: 13px/1.4 ui-monospace, Menlo, Consolas, monospace;
+    scrollbar-color: #5a5258 var(--card);
+  }
+  .go {
+    margin-top: 12px; width: 100%; padding: 12px; border: 0; border-radius: 10px; cursor: pointer;
+    background: var(--gold); color: #261a0c; font-weight: 700; font-size: 17px;
+  }
+  #out { margin-top: 20px; }
+  .row { display: flex; gap: 12px; padding: 10px 12px; border-radius: 8px; background: var(--card); margin-bottom: 8px; }
+  .tag { flex: 0 0 82px; font-weight: 700; }
+  .tag.ok { color: var(--ok); } .tag.bad { color: var(--bad); }
+  .msg { overflow-wrap: anywhere; }
+  details { margin-top: 28px; color: var(--muted); }
+  summary { cursor: pointer; color: var(--text); }
+  a { color: var(--gold); }
+  code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; color: var(--text); }
+  ol li { margin-bottom: 6px; }
+  .rolls { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; color: var(--muted); margin-top: 12px; overflow-wrap: anywhere; }
+</style>
+</head>
+<body>
+<main>
+  <div class="lang"><button data-l="tr">TR</button> <button data-l="en">EN</button></div>
+  <h1 data-t="title"></h1>
+  <p data-t="intro"></p>
+  <textarea id="data" spellcheck="false" placeholder='{"matchId":"...","commit":"...","serverSeed":"...","seed1":"...","seed2":"...","rolls":[...]}'></textarea>
+  <button class="go" id="go" data-t="verify"></button>
+  <div id="out"></div>
+  <details>
+    <summary data-t="howTitle"></summary>
+    <ol>
+      <li data-t="how1"></li>
+      <li data-t="how2"></li>
+      <li data-t="how3"></li>
+      <li data-t="how4"></li>
+    </ol>
+    <p data-t="how5"></p>
+  </details>
+  <p><a href="https://github.com/SlashMinus/durust-tavla-zar" data-t="source"></a></p>
+</main>
+<script>
+// Bu sayfa fairdice.js'in tarayıcı kopyasıdır; hiçbir yere veri göndermez.
+// This page is a browser copy of fairdice.js; it sends no data anywhere.
+const TEXT = {
+  tr: {
+    title: 'Zar Doğrulama',
+    intro: 'Maç sonu ekranında "Zarları Doğrula" > "Bilgileri Kopyala"ya bas, kopyalananı buraya yapıştır. Hesap tamamen senin cihazında yapılır.',
+    verify: 'Doğrula',
+    howTitle: 'Nasıl çalışıyor?',
+    how1: 'Maç başlamadan sunucu gizli bir tohum (serverSeed) seçer ve yalnız parmak izini gösterir: commit = SHA-256(serverSeed).',
+    how2: 'İki oyuncunun telefonu da kendi tohumunu (seed1, seed2) yollar. Sunucu tohumunu önceden kilitlediği için oyunculara göre değiştiremez.',
+    how3: 'n. atış (0\'dan sayılır): HMAC-SHA256(anahtar serverSeed, "seed1:seed2:n:c"), c = 0\'dan. 252\'den küçük her bayt (bayt % 6) + 1 olarak bir zardır; ilk ikisi o atışın zarlarıdır.',
+    how4: 'Maç bitince sunucu serverSeed\'i açıklar. Parmak izi tutuyorsa ve bütün zarlar bu formülden aynı çıkıyorsa, zarlar maç sırasında değiştirilmemiştir.',
+    how5: 'Kaynak kod: fairdice.js (sunucudaki dosyanın aynısı), komut satırı için verify.js.',
+    source: 'Kaynak kod (GitHub)',
+    ok: 'TAMAM', bad: 'HATA',
+    badJson: 'Yapıştırılan metin okunamadı. Oyundan kopyaladığın metnin tamamını yapıştır.',
+    commitOk: 'Parmak izi tutuyor: SHA-256(serverSeed) = commit. Zarlar maç başlamadan belirlenmişti.',
+    commitBad: 'Parmak izi tutmuyor: açıklanan tohum maç başındaki kilitle uyuşmuyor!',
+    rollsOk: (n) => `${n} atışın hepsi tohumlardan yeniden hesaplandı ve maçta görülenlerle aynı.`,
+    rollsBad: (n) => `${n}. atış tohumlardan hesaplananla uyuşmuyor!`,
+    noRolls: 'Zar listesi boş.',
+    computed: 'Hesaplanan zarlar:',
+  },
+  en: {
+    title: 'Dice Verification',
+    intro: 'On the end-of-match screen tap "Verify Dice" > "Copy Data", then paste it here. Everything is calculated on your own device.',
+    verify: 'Verify',
+    howTitle: 'How does it work?',
+    how1: 'Before the match starts the server picks a secret seed (serverSeed) and shows only its fingerprint: commit = SHA-256(serverSeed).',
+    how2: 'Both players\' phones send their own seed (seed1, seed2). The server locked its seed first, so it cannot change it to suit the players.',
+    how3: 'Roll n (counted from 0): HMAC-SHA256(key serverSeed, "seed1:seed2:n:c"), with c from 0. Every byte below 252 gives one die as (byte % 6) + 1; the first two are that roll\'s dice.',
+    how4: 'When the match ends the server reveals serverSeed. If the fingerprint matches and every roll comes out the same from this formula, the dice were not changed during the match.',
+    how5: 'Source code: fairdice.js (identical to the server\'s file), verify.js for the command line.',
+    source: 'Source code (GitHub)',
+    ok: 'OK', bad: 'FAILED',
+    badJson: 'Could not read the pasted text. Paste everything you copied from the game.',
+    commitOk: 'Fingerprint matches: SHA-256(serverSeed) = commit. The dice were fixed before the match started.',
+    commitBad: 'Fingerprint does not match: the revealed seed is not the one locked at the start!',
+    rollsOk: (n) => `All ${n} rolls were recalculated from the seeds and match the ones seen in the match.`,
+    rollsBad: (n) => `Roll #${n} does not match what the seeds produce!`,
+    noRolls: 'The roll list is empty.',
+    computed: 'Calculated dice:',
+  },
+};
+
+let lang = (navigator.language || 'tr').toLowerCase().startsWith('tr') ? 'tr' : 'en';
+const T = (k) => TEXT[lang][k];
+
+function applyLang() {
+  document.documentElement.lang = lang;
+  document.title = 'Dürüst Tavla — ' + T('title');
+  for (const el of document.querySelectorAll('[data-t]')) el.textContent = T(el.dataset.t);
+  for (const b of document.querySelectorAll('.lang button')) b.classList.toggle('on', b.dataset.l === lang);
+  document.getElementById('out').innerHTML = '';
+}
+for (const b of document.querySelectorAll('.lang button')) b.onclick = () => { lang = b.dataset.l; applyLang(); };
+applyLang();
+
+const enc = new TextEncoder();
+const hex = (buf) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
+
+async function commitOf(serverSeed) {
+  return hex(await crypto.subtle.digest('SHA-256', enc.encode(serverSeed)));
+}
+
+async function rollAt(key, seed1, seed2, n) {
+  const dice = [];
+  for (let c = 0; dice.length < 2; c++) {
+    const h = new Uint8Array(await crypto.subtle.sign('HMAC', key, enc.encode(`${seed1}:${seed2}:${n}:${c}`)));
+    for (const b of h) {
+      if (b < 252) dice.push((b % 6) + 1);
+      if (dice.length === 2) break;
+    }
+  }
+  return dice;
+}
+
+function row(ok, text) {
+  const div = document.createElement('div');
+  div.className = 'row';
+  const tag = document.createElement('span');
+  tag.className = 'tag ' + (ok ? 'ok' : 'bad');
+  tag.textContent = ok ? T('ok') : T('bad');
+  const msg = document.createElement('span');
+  msg.className = 'msg';
+  msg.textContent = text;
+  div.append(tag, msg);
+  return div;
+}
+
+document.getElementById('go').onclick = async () => {
+  const out = document.getElementById('out');
+  out.innerHTML = '';
+  let data;
+  try {
+    data = JSON.parse(document.getElementById('data').value.trim());
+  } catch {
+    out.append(row(false, T('badJson')));
+    return;
+  }
+  const serverSeed = String(data.serverSeed || '');
+  out.append((await commitOf(serverSeed)) === data.commit ? row(true, T('commitOk')) : row(false, T('commitBad')));
+
+  const rolls = Array.isArray(data.rolls) ? data.rolls : [];
+  if (rolls.length === 0) {
+    out.append(row(false, T('noRolls')));
+    return;
+  }
+  const key = await crypto.subtle.importKey('raw', enc.encode(serverSeed), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const computed = [];
+  let bad = 0;
+  for (let n = 0; n < Math.ceil(rolls.length / 2); n++) {
+    const [d1, d2] = await rollAt(key, data.seed1 || '', data.seed2 || '', n);
+    computed.push(`${d1}-${d2}`);
+    if (!bad && (d1 !== rolls[2 * n] || d2 !== rolls[2 * n + 1])) bad = n + 1;
+  }
+  out.append(bad ? row(false, T('rollsBad')(bad)) : row(true, T('rollsOk')(computed.length)));
+  const list = document.createElement('div');
+  list.className = 'rolls';
+  list.textContent = T('computed') + ' ' + computed.join('  ');
+  out.append(list);
+};
+</script>
+</body>
+</html>
